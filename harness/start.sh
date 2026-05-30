@@ -84,28 +84,36 @@ create_layout() {
   # pane 테두리 상단에 타이틀 표시
   tmux set-option -t "$SESSION" -g pane-border-status top
   # pane_title 대신 pane_index 기반으로 고정 레이블 표시 (프로그램 덮어쓰기 원천 차단)
-  tmux set-option -t "$SESSION" -g pane-border-format     "#{?pane_active,#[fg=colour226 bold],#[fg=colour245]}#{?#{==:#{pane_index},0}, ORCHESTRATOR ,#{?#{==:#{pane_index},1}, ARCHITECT ,#{?#{==:#{pane_index},2}, PLANNER ,#{?#{==:#{pane_index},3}, DESIGNER ,#{?#{==:#{pane_index},4}, IMPLEMENTER ,#{?#{==:#{pane_index},5}, REVIEWER , pane#{pane_index} }}}}}}#[default]"
+  # pane 인덱스 → 에이전트: 0=Orchestrator 1=Architect 2=Implementer 3=Planner 4=Designer 5=Reviewer
+  tmux set-option -t "$SESSION" -g pane-border-format     "#{?pane_active,#[fg=colour226 bold],#[fg=colour245]}#{?#{==:#{pane_index},0}, ORCHESTRATOR ,#{?#{==:#{pane_index},1}, ARCHITECT ,#{?#{==:#{pane_index},2}, IMPLEMENTER ,#{?#{==:#{pane_index},3}, PLANNER ,#{?#{==:#{pane_index},4}, DESIGNER ,#{?#{==:#{pane_index},5}, REVIEWER , pane#{pane_index} }}}}}}#[default]"
 
   # 프로그램의 타이틀 변경 시도 차단
   tmux set-option -t "$SESSION" -g allow-rename off
   tmux set-option -t "$SESSION" -g automatic-rename off
   tmux set-option -t "$SESSION" -g set-titles off
 
-  # 상단: pane0(Orchestrator) | pane1(Architect)
-  tmux split-window -h -t "$SESSION:agents.0"
+  # 3열 레이아웃:
+  #   1열: Orchestrator (전체 높이)
+  #   2열: Architect(top) / Planner(mid) / Designer(bot)
+  #   3열: Implementer(top) / Reviewer(bot)
+  #
+  # pane 생성 순서 → 인덱스:
+  #   0=Orchestrator  1=Architect  2=Implementer
+  #   3=Planner       4=Designer   5=Reviewer
 
-  # 하단 행: pane0 아래로 분할
-  tmux split-window -v -t "$SESSION:agents.0" -p 50
-  # 하단 행: pane1 아래로 분할
-  tmux split-window -v -t "$SESSION:agents.1" -p 50
+  # Step1: 3개의 full-height 열 생성
+  tmux split-window -h -t "$SESSION:agents.0" -p 67   # pane1: 오른쪽 2/3 (중간+우측)
+  tmux split-window -h -t "$SESSION:agents.1" -p 50   # pane2: 오른쪽 1/3 (우측 열)
 
-  # 하단 좌측 분할: Planner | Designer
-  tmux split-window -h -t "$SESSION:agents.2"
-  # 하단 우측 분할: Implementer | Reviewer
-  tmux split-window -h -t "$SESSION:agents.4"
+  # Step2: 중간 열(pane1=Architect) 세로 2분할 → Planner, Designer 추가
+  tmux split-window -v -t "$SESSION:agents.1" -p 67   # pane3: 중간 열 하단 2/3
+  tmux split-window -v -t "$SESSION:agents.3" -p 50   # pane4: 중간 열 최하단
 
-  # 각 pane에 역할 타이틀 부여
-  local titles=("ORCHESTRATOR" "ARCHITECT" "PLANNER" "DESIGNER" "IMPLEMENTER" "REVIEWER")
+  # Step3: 우측 열(pane2=Implementer) 세로 1분할 → Reviewer 추가
+  tmux split-window -v -t "$SESSION:agents.2" -p 50   # pane5: 우측 열 하단
+
+  # 각 pane에 역할 타이틀 부여 (pane 생성 순서와 동일)
+  local titles=("ORCHESTRATOR" "ARCHITECT" "IMPLEMENTER" "PLANNER" "DESIGNER" "REVIEWER")
   for i in "${!titles[@]}"; do
     tmux select-pane -t "$SESSION:agents.$i" -T "${titles[$i]}"
   done
@@ -118,8 +126,9 @@ create_layout() {
 start_agents() {
   log "Claude Code 인스턴스 시작 중..."
 
-  local agents=("orchestrator" "architect" "planner" "designer" "implementer" "reviewer")
-  local display_names=("Orchestrator" "Architect" "Planner" "Designer" "Implementer" "Reviewer")
+  # pane 인덱스 순서: 0=Orchestrator 1=Architect 2=Implementer 3=Planner 4=Designer 5=Reviewer
+  local agents=("orchestrator" "architect" "implementer" "planner" "designer" "reviewer")
+  local display_names=("Orchestrator" "Architect" "Implementer" "Planner" "Designer" "Reviewer")
 
   # 에이전트별 모델
   # Opus  : 깊은 추론 필요 (Architect, Reviewer)
@@ -127,9 +136,9 @@ start_agents() {
   local models=(
     "claude-sonnet-4-6"   # 0: Orchestrator
     "claude-opus-4-7"     # 1: Architect
-    "claude-sonnet-4-6"   # 2: Planner
-    "claude-sonnet-4-6"   # 3: Designer
-    "claude-sonnet-4-6"   # 4: Implementer
+    "claude-sonnet-4-6"   # 2: Implementer
+    "claude-sonnet-4-6"   # 3: Planner
+    "claude-sonnet-4-6"   # 4: Designer
     "claude-opus-4-7"     # 5: Reviewer
   )
 
@@ -139,9 +148,9 @@ start_agents() {
   local permissions=(
     "skip"    # 0: Orchestrator — tmux 명령 실행 필수
     "skip"    # 1: Architect    — 문서 파일 작성 빈도 높음
-    "skip"    # 2: Planner      — 문서 파일 작성 빈도 높음
-    "skip"    # 3: Designer     — 문서 파일 작성 빈도 높음
-    "skip"    # 4: Implementer  — src/ 파일 다수 생성
+    "skip"    # 2: Implementer  — src/ 파일 다수 생성
+    "skip"    # 3: Planner      — 문서 파일 작성 빈도 높음
+    "skip"    # 4: Designer     — 문서 파일 작성 빈도 높음
     "normal"  # 5: Reviewer     — 사람이 최종 확인하는 게이트
   )
 
@@ -163,12 +172,20 @@ start_agents() {
     fi
 
     log "$name 시작 (claude 초기화 대기 중...)"
-    sleep 5  # Claude Code 초기화 대기
+
+    # Claude Code 완전 초기화 대기
+    # pane에 프롬프트(>)가 뜰 때까지 폴링
+    local max_wait=30
+    local waited=0
+    while ! tmux capture-pane -t "$SESSION:agents.$i" -p 2>/dev/null | grep -q "[>?]"; do
+      sleep 1
+      waited=$((waited + 1))
+      [[ $waited -ge $max_wait ]] && { warn "$name 초기화 타임아웃 (${max_wait}s)"; break; }
+    done
+    sleep 1  # 프롬프트 뜬 후 안정화 대기
 
     # 역할 파일 경로를 직접 전달 (tmux 버퍼 크기 제한 우회)
-    tmux send-keys -t "$SESSION:agents.$i" \
-      "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해." \
-      Enter
+    tmux send-keys -t "$SESSION:agents.$i"       "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해."       Enter
 
     sleep 2
   done
@@ -225,11 +242,13 @@ print_guide() {
   echo -e "  ${BOLD}창 전환${NC}      Ctrl+b → w"
   echo ""
   echo    "  [레이아웃]"
-  echo    "  ┌───────────────────┬────────────────────┐"
-  echo    "  │  0: Orchestrator  │   1: Architect     │"
-  echo    "  ├────────┬──────────┼─────────┬──────────┤"
-  echo    "  │2:Plann.│3:Designer│4:Impl.  │5:Reviewer│"
-  echo    "  └────────┴──────────┴─────────┴──────────┘"
+  echo    "  ┌────────────────┬────────────────┬────────────────┐"
+  echo    "  │                │  1: Architect  │ 2: Implementer │"
+  echo    "  │ 0: Orchestrator├────────────────┼────────────────┤"
+  echo    "  │                │  3: Planner    │ 5: Reviewer    │"
+  echo    "  │                ├────────────────┤                │"
+  echo    "  │                │  4: Designer   │                │"
+  echo    "  └────────────────┴────────────────┴────────────────┘"
   echo    "  + monitor 탭 (Ctrl+b → w로 전환)"
   echo ""
 }
