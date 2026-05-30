@@ -30,9 +30,9 @@
 | pane | 에이전트 | 역할 파일 |
 |---|---|---|
 | 1 | Architect | harness/agents/architect.md |
-| 2 | Planner | harness/agents/planner.md |
-| 3 | Designer | harness/agents/designer.md |
-| 4 | Implementer | harness/agents/implementer.md |
+| 2 | Implementer | harness/agents/implementer.md |
+| 3 | Planner | harness/agents/planner.md |
+| 4 | Designer | harness/agents/designer.md |
 | 5 | Reviewer | harness/agents/reviewer.md |
 
 tmux 세션: `vue-pkg` / 창: `agents`
@@ -102,11 +102,11 @@ cat harness/workspace/results/task_003.md
 ## 전체 자동화 흐름
 
 ### Phase 1: 초기 기획 (병렬)
-→ architect(pane 1) + planner(pane 2) + designer(pane 3) 동시 분배
+→ architect(pane 1) + planner(pane 3) + designer(pane 4) 동시 분배
 → 3개 `.done` 감지 시 Phase 2 자동 진행
 
 ### Phase 2: 구현 (순차)
-→ implementer(pane 4) 분배
+→ implementer(pane 2) 분배
 → `.done` 감지 시 Phase 3 자동 진행
 
 ### Phase 3: 리뷰 (순차)
