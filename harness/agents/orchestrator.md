@@ -47,8 +47,8 @@ tmux send-keys -t vue-pkg:agents.<pane> "<메시지>" Enter
 
 # 병렬 분배 예시 (architect + planner + designer 동시)
 tmux send-keys -t vue-pkg:agents.1 "harness/workspace/tasks/task_001.json 읽고 즉시 작업 시작해줘." Enter
-tmux send-keys -t vue-pkg:agents.3 "harness/workspace/tasks/task_002.json 읽고 즉시 작업 시작해줘." Enter
-tmux send-keys -t vue-pkg:agents.4 "harness/workspace/tasks/task_003.json 읽고 즉시 작업 시작해줘." Enter
+tmux send-keys -t vue-pkg:agents.2 "harness/workspace/tasks/task_002.json 읽고 즉시 작업 시작해줘." Enter
+tmux send-keys -t vue-pkg:agents.3 "harness/workspace/tasks/task_003.json 읽고 즉시 작업 시작해줘." Enter
 ```
 
 ---
@@ -131,9 +131,9 @@ sed -i '' 's/"status": "in_progress"/"status": "blocked"/' harness/workspace/tas
 | 작업 유형 | pane | 에이전트 |
 |---|---|---|
 | 기술스택, 아키텍처, 빌드 설계 | 1 | architect |
-| 실제 코드 · 테스트 작성 | 2 | implementer |
-| 기능 목록, 로드맵, 우선순위 | 3 | planner |
-| Props/API 인터페이스, DX 설계 | 4 | designer |
+| 기능 목록, 로드맵, 우선순위 | 2 | planner |
+| Props/API 인터페이스, DX 설계 | 3 | designer |
+| 실제 코드 · 테스트 작성 | 4 | implementer |
 | 코드 리뷰 · 품질 검증 | 5 | reviewer |
 
 ---
