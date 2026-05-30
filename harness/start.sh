@@ -163,12 +163,20 @@ start_agents() {
     fi
 
     log "$name 시작 (claude 초기화 대기 중...)"
-    sleep 5  # Claude Code 초기화 대기
+
+    # Claude Code 완전 초기화 대기
+    # pane에 프롬프트(>)가 뜰 때까지 폴링
+    local max_wait=30
+    local waited=0
+    while ! tmux capture-pane -t "$SESSION:agents.$i" -p 2>/dev/null | grep -q "[>?]"; do
+      sleep 1
+      waited=$((waited + 1))
+      [[ $waited -ge $max_wait ]] && { warn "$name 초기화 타임아웃 (${max_wait}s)"; break; }
+    done
+    sleep 1  # 프롬프트 뜬 후 안정화 대기
 
     # 역할 파일 경로를 직접 전달 (tmux 버퍼 크기 제한 우회)
-    tmux send-keys -t "$SESSION:agents.$i" \
-      "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해." \
-      Enter
+    tmux send-keys -t "$SESSION:agents.$i"       "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해."       Enter
 
     sleep 2
   done
