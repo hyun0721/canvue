@@ -121,15 +121,46 @@ start_agents() {
   local agents=("orchestrator" "architect" "planner" "designer" "implementer" "reviewer")
   local display_names=("Orchestrator" "Architect" "Planner" "Designer" "Implementer" "Reviewer")
 
+  # 에이전트별 모델
+  # Opus  : 깊은 추론 필요 (Architect, Reviewer)
+  # Sonnet: 일반 작업 (Orchestrator, Planner, Designer, Implementer)
+  local models=(
+    "claude-sonnet-4-6"   # 0: Orchestrator
+    "claude-opus-4-7"     # 1: Architect
+    "claude-sonnet-4-6"   # 2: Planner
+    "claude-sonnet-4-6"   # 3: Designer
+    "claude-sonnet-4-6"   # 4: Implementer
+    "claude-opus-4-7"     # 5: Reviewer
+  )
+
+  # 에이전트별 권한 모드
+  # skip : --dangerously-skip-permissions (자동화 / 승인 생략)
+  # normal: 일반 모드 (사람이 최종 게이트 역할 — Reviewer 전용)
+  local permissions=(
+    "skip"    # 0: Orchestrator — tmux 명령 실행 필수
+    "skip"    # 1: Architect    — 문서 파일 작성 빈도 높음
+    "skip"    # 2: Planner      — 문서 파일 작성 빈도 높음
+    "skip"    # 3: Designer     — 문서 파일 작성 빈도 높음
+    "skip"    # 4: Implementer  — src/ 파일 다수 생성
+    "normal"  # 5: Reviewer     — 사람이 최종 확인하는 게이트
+  )
+
   for i in "${!agents[@]}"; do
     local role="${agents[$i]}"
     local name="${display_names[$i]}"
+    local model="${models[$i]}"
+    local perm="${permissions[$i]}"
     local md_file="$HARNESS_DIR/agents/${role}.md"
 
     [[ -f "$md_file" ]] || { warn "$md_file 없음, 스킵"; continue; }
 
-    # 프로젝트 루트로 이동 후 claude 실행
-    tmux send-keys -t "$SESSION:agents.$i" "cd $PROJECT_ROOT && claude" Enter
+    # 권한 모드에 따라 claude 실행 명령 구성
+    if [[ "$perm" == "skip" ]]; then
+      tmux send-keys -t "$SESSION:agents.$i"         "cd $PROJECT_ROOT && claude --model $model --dangerously-skip-permissions" Enter
+    else
+      # Reviewer: 일반 모드 (승인 게이트 역할)
+      tmux send-keys -t "$SESSION:agents.$i"         "cd $PROJECT_ROOT && claude --model $model" Enter
+    fi
 
     log "$name 시작 (claude 초기화 대기 중...)"
     sleep 5  # Claude Code 초기화 대기
