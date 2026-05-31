@@ -34,11 +34,11 @@ pane_for() {
   esac
 }
 
-# ── tmux dispatch ─────────────────────────────────────────────────────────────
+# ── tmux dispatch (paste-buffer + C-m 방식) ──────────────────────────────────
 dispatch() {
   local pane="$1"
   local msg="$2"
-  tmux send-keys -t "$SESSION:agents.$pane" "$msg" Enter
+  bash "$HARNESS_DIR/dispatch.sh" "$pane" "$msg"
 }
 
 # ── task 파일 찾기 ─────────────────────────────────────────────────────────────

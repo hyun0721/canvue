@@ -26,9 +26,7 @@ PANE_MAP[reviewer]=5
 dispatch_to() {
   local pane="$1"
   local message="$2"
-  tmux send-keys -t "$SESSION:agents.$pane" "$message"
-  sleep 0.3
-  tmux send-keys -t "$SESSION:agents.$pane" "" Enter
+  bash "$(dirname "${BASH_SOURCE[0]}")/dispatch.sh" "$pane" "$message"
 }
 
 process_mentions() {

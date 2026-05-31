@@ -184,8 +184,9 @@ start_agents() {
     done
     sleep 1  # 프롬프트 뜬 후 안정화 대기
 
-    # 역할 파일 경로를 직접 전달 (tmux 버퍼 크기 제한 우회)
-    tmux send-keys -t "$SESSION:agents.$i"       "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해."       Enter
+    # 역할 파일 경로를 직접 전달 (dispatch.sh: paste-buffer + C-m 방식)
+    bash "$HARNESS_DIR/dispatch.sh" "$i" \
+      "harness/agents/${role}.md 파일을 읽고 역할을 인지해줘. 인지 완료 시 '✅ ${name} 준비 완료' 라고만 짧게 답해."
 
     sleep 2
   done
