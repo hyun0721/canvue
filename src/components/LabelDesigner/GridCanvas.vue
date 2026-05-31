@@ -80,16 +80,20 @@ function typeIcon(type: string): string {
         @drop="onDrop($event, rowIdx, colIdx)"
       >
         <template v-if="cell?.element">
-          <span class="canvue-cell__type-icon">{{ typeIcon(cell.element.type) }}</span>
-          <span class="canvue-cell__field-key">{{ cell.element.fieldKey }}</span>
-          <button
-            class="canvue-cell__remove"
-            title="Remove element"
-            @click.stop="emit('remove-element', rowIdx, colIdx)"
-          >×</button>
+          <slot name="cell-content" :cell="cell" :row="rowIdx" :col="colIdx" :element="cell.element">
+            <span class="canvue-cell__type-icon">{{ typeIcon(cell.element.type) }}</span>
+            <span class="canvue-cell__field-key">{{ cell.element.fieldKey }}</span>
+            <button
+              class="canvue-cell__remove"
+              title="Remove element"
+              @click.stop="emit('remove-element', rowIdx, colIdx)"
+            >×</button>
+          </slot>
         </template>
         <template v-else>
-          <span class="canvue-cell__placeholder">drop here</span>
+          <slot name="cell-content" :cell="null" :row="rowIdx" :col="colIdx" :element="undefined">
+            <span class="canvue-cell__placeholder">drop here</span>
+          </slot>
         </template>
       </div>
     </template>

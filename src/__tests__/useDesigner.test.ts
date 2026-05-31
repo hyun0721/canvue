@@ -62,6 +62,40 @@ describe('useDesigner', () => {
     expect(format.value.cells).toHaveLength(0)
   })
 
+  it('updateGrid returns removed cells', () => {
+    const { placeElement, updateGrid } = useDesigner()
+    placeElement(3, 3, textEl)
+    placeElement(0, 0, textEl)
+    const removed = updateGrid({ rows: 2, cols: 2 })
+    expect(removed).toHaveLength(1)
+    expect(removed[0].row).toBe(3)
+    expect(removed[0].col).toBe(3)
+  })
+
+  it('updateSpan sets rowSpan and colSpan on a cell', () => {
+    const { placeElement, getCellAt, updateSpan } = useDesigner()
+    placeElement(0, 0, textEl)
+    updateSpan(0, 0, 2, 3)
+    const cell = getCellAt(0, 0)
+    expect(cell?.rowSpan).toBe(2)
+    expect(cell?.colSpan).toBe(3)
+  })
+
+  it('updateSpan clamps to minimum 1', () => {
+    const { placeElement, getCellAt, updateSpan } = useDesigner()
+    placeElement(0, 0, textEl)
+    updateSpan(0, 0, 0, -1)
+    const cell = getCellAt(0, 0)
+    expect(cell?.rowSpan).toBe(1)
+    expect(cell?.colSpan).toBe(1)
+  })
+
+  it('updateSpan does nothing if cell does not exist', () => {
+    const { format, updateSpan } = useDesigner()
+    expect(() => updateSpan(0, 0, 2, 2)).not.toThrow()
+    expect(format.value.cells).toHaveLength(0)
+  })
+
   it('selects and clears selection', () => {
     const { selectedCell, selectCell, clearSelection } = useDesigner()
     selectCell(2, 3)

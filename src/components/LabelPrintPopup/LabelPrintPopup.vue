@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { LabelFormat, DataRecord } from '../../types'
+import type { PrintOptions, PrintError } from '../../composables/usePrint'
 import { usePrint } from '../../composables/usePrint'
 import PrintPreview from './PrintPreview.vue'
 
@@ -7,11 +8,14 @@ const props = defineProps<{
   format: LabelFormat
   records: DataRecord[]
   open: boolean
+  printOptions?: PrintOptions
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'close': []
+  'print-success': []
+  'print-error': [error: PrintError]
 }>()
 
 const { printLabels } = usePrint()
@@ -22,9 +26,11 @@ function handleClose(): void {
 }
 
 async function handlePrint(): Promise<void> {
-  const result = await printLabels(props.format, props.records)
-  if (!result.success) {
-    console.error('canvue print error:', result.error?.message)
+  const result = await printLabels(props.format, props.records, props.printOptions)
+  if (result.success) {
+    emit('print-success')
+  } else if (result.error) {
+    emit('print-error', result.error)
   }
 }
 </script>

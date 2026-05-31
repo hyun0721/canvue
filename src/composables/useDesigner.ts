@@ -79,13 +79,26 @@ export function useDesigner(initialFormat?: LabelFormat) {
     selectedCell.value = null
   }
 
-  function updateGrid(config: Partial<GridConfig>): void {
-    format.value.grid = { ...format.value.grid, ...config }
-    // Remove out-of-bounds cells
+  function updateGrid(config: Partial<GridConfig>): LabelCell[] {
+    const newGrid = { ...format.value.grid, ...config }
+    const removed = format.value.cells.filter(
+      (c) => c.row >= newGrid.rows || c.col >= newGrid.cols
+    )
+    format.value.grid = newGrid
     format.value.cells = format.value.cells.filter(
-      (c) => c.row < format.value.grid.rows && c.col < format.value.grid.cols
+      (c) => c.row < newGrid.rows && c.col < newGrid.cols
     )
     touch()
+    return removed
+  }
+
+  function updateSpan(row: number, col: number, rowSpan: number, colSpan: number): void {
+    const cell = getCellAt(row, col)
+    if (cell) {
+      cell.rowSpan = Math.max(1, rowSpan)
+      cell.colSpan = Math.max(1, colSpan)
+      touch()
+    }
   }
 
   function renameFormat(name: string): void {
@@ -118,6 +131,7 @@ export function useDesigner(initialFormat?: LabelFormat) {
     selectCell,
     clearSelection,
     updateGrid,
+    updateSpan,
     renameFormat,
     resetFormat,
   }

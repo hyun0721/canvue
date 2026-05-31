@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update-style': [row: number, col: number, style: Partial<CSSProperties>]
+  'update-span': [row: number, col: number, rowSpan: number, colSpan: number]
   'close': []
 }>()
 
@@ -25,6 +26,42 @@ function updateFontSize(e: Event): void {
 
 function updateTextAlign(align: string): void {
   emit('update-style', props.row, props.col, { textAlign: align as CSSProperties['textAlign'] })
+}
+
+function updateColor(e: Event): void {
+  emit('update-style', props.row, props.col, { color: (e.target as HTMLInputElement).value })
+}
+
+function updateFontWeight(e: Event): void {
+  const val = (e.target as HTMLSelectElement).value
+  emit('update-style', props.row, props.col, { fontWeight: val as CSSProperties['fontWeight'] })
+}
+
+function updateFontFamily(e: Event): void {
+  emit('update-style', props.row, props.col, { fontFamily: (e.target as HTMLInputElement).value })
+}
+
+function updateBgColor(e: Event): void {
+  emit('update-style', props.row, props.col, { backgroundColor: (e.target as HTMLInputElement).value })
+}
+
+function updatePadding(e: Event): void {
+  const val = (e.target as HTMLInputElement).value
+  emit('update-style', props.row, props.col, { padding: `${val}px` })
+}
+
+function updateRowSpan(e: Event): void {
+  const val = parseInt((e.target as HTMLInputElement).value)
+  if (!isNaN(val) && val >= 1) {
+    emit('update-span', props.row, props.col, val, props.cell?.colSpan ?? 1)
+  }
+}
+
+function updateColSpan(e: Event): void {
+  const val = parseInt((e.target as HTMLInputElement).value)
+  if (!isNaN(val) && val >= 1) {
+    emit('update-span', props.row, props.col, props.cell?.rowSpan ?? 1, val)
+  }
 }
 </script>
 
@@ -65,8 +102,70 @@ function updateTextAlign(align: string): void {
           >{{ align }}</button>
         </div>
       </div>
+      <div class="canvue-cell-editor__row">
+        <label>Color</label>
+        <input type="color" :value="element.style?.color ?? '#000000'" @change="updateColor" />
+      </div>
+      <div class="canvue-cell-editor__row">
+        <label>Font Weight</label>
+        <select :value="element.style?.fontWeight ?? 'normal'" @change="updateFontWeight">
+          <option value="normal">Normal</option>
+          <option value="bold">Bold</option>
+          <option value="600">600</option>
+        </select>
+      </div>
+      <div class="canvue-cell-editor__row">
+        <label>Font Family</label>
+        <input
+          type="text"
+          :value="element.style?.fontFamily ?? ''"
+          placeholder="sans-serif"
+          @change="updateFontFamily"
+        />
+      </div>
+      <div class="canvue-cell-editor__row">
+        <label>BG Color</label>
+        <input
+          type="color"
+          :value="element.style?.backgroundColor ?? '#ffffff'"
+          @change="updateBgColor"
+        />
+      </div>
+      <div class="canvue-cell-editor__row">
+        <label>Padding (px)</label>
+        <input
+          type="number"
+          min="0"
+          max="40"
+          :value="parseInt(String(element.style?.padding ?? '0'))"
+          @change="updatePadding"
+        />
+      </div>
     </template>
-    <p v-else class="canvue-cell-editor__empty">No element in this cell.</p>
+    <template v-if="cell">
+      <div class="canvue-cell-editor__section-title">Cell Span</div>
+      <div class="canvue-cell-editor__row">
+        <label>Row Span</label>
+        <input
+          type="number"
+          min="1"
+          :max="format.grid.rows - row"
+          :value="cell.rowSpan ?? 1"
+          @change="updateRowSpan"
+        />
+      </div>
+      <div class="canvue-cell-editor__row">
+        <label>Col Span</label>
+        <input
+          type="number"
+          min="1"
+          :max="format.grid.cols - col"
+          :value="cell.colSpan ?? 1"
+          @change="updateColSpan"
+        />
+      </div>
+    </template>
+    <p v-if="!element && cell" class="canvue-cell-editor__empty">No element in this cell.</p>
   </div>
 </template>
 
@@ -159,5 +258,41 @@ function updateTextAlign(align: string): void {
   color: #94a3b8;
   font-size: 12px;
   text-align: center;
+}
+
+.canvue-cell-editor__section-title {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid #f1f5f9;
+  background: var(--canvue-panel-header-bg, #f1f5f9);
+}
+
+.canvue-cell-editor__row input[type='color'] {
+  width: 36px;
+  height: 26px;
+  padding: 0 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.canvue-cell-editor__row select {
+  padding: 3px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.canvue-cell-editor__row input[type='text'] {
+  width: 100px;
+  padding: 3px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 12px;
 }
 </style>

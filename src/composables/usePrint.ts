@@ -4,10 +4,12 @@ import { renderBarcode, renderQrCode } from '../utils/barcode'
 export interface PrintOptions {
   title?: string
   pageBreakAfter?: boolean
+  /** 인쇄 방식. 'auto'는 window 먼저 시도하고 팝업 차단 시 iframe으로 fallback. */
+  mode?: 'window' | 'iframe' | 'auto'
 }
 
 export interface PrintError {
-  code: string
+  code: 'POPUP_BLOCKED' | 'UNKNOWN' | 'SSR'
   message: string
 }
 
@@ -30,8 +32,19 @@ export function usePrint() {
     }
 
     const html = await buildPrintHtml(format, records, options)
+    const mode = options.mode ?? 'auto'
+
+    if (mode === 'iframe') {
+      return printViaIframe(html)
+    }
+
+    // mode === 'window' | 'auto': window.open 먼저 시도
     const win = window.open('', '_blank', 'width=800,height=600')
     if (!win) {
+      if (mode === 'auto') {
+        // 팝업 차단 시 iframe으로 fallback
+        return printViaIframe(html)
+      }
       return {
         success: false,
         error: {
@@ -50,6 +63,40 @@ export function usePrint() {
   }
 
   return { printLabels }
+}
+
+/**
+ * 팝업 차단 환경에서 숨김 iframe으로 인쇄 (ADR-004 fallback).
+ * iframe은 인쇄 다이얼로그 완료 후 1초 뒤 자동 제거.
+ */
+function printViaIframe(html: string): PrintResult {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute(
+    'style',
+    'position:fixed;top:0;left:0;width:0;height:0;border:none;visibility:hidden'
+  )
+  document.body.appendChild(iframe)
+  try {
+    const doc = iframe.contentDocument
+    if (!doc) throw new Error('iframe contentDocument not accessible')
+    doc.open()
+    doc.write(html)
+    doc.close()
+    iframe.contentWindow?.focus()
+    setTimeout(() => {
+      iframe.contentWindow?.print()
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe)
+      }, 1000)
+    }, 300)
+    return { success: true }
+  } catch {
+    if (document.body.contains(iframe)) document.body.removeChild(iframe)
+    return {
+      success: false,
+      error: { code: 'UNKNOWN', message: 'iframe print failed.' },
+    }
+  }
 }
 
 async function buildPrintHtml(

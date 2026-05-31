@@ -1,26 +1,31 @@
 <script setup lang="ts">
 import { watch, computed, watchEffect } from 'vue'
-import type { LabelFormat, ElementDefinition } from '../../types'
+import type { LabelFormat, LabelCell, ElementDefinition, GridConfig } from '../../types'
 import type { CSSProperties } from 'vue'
 import { useDesigner } from '../../composables/useDesigner'
 import GridCanvas from './GridCanvas.vue'
 import ElementPanel from './ElementPanel.vue'
 import CellEditor from './CellEditor.vue'
 
+export interface LabelDesignerExpose {
+  resetFormat(newFormat?: LabelFormat): void
+  placeElement(row: number, col: number, definition: ElementDefinition): void
+  removeElement(row: number, col: number): void
+  updateGrid(config: Partial<GridConfig>): void
+  selectCell(row: number, col: number): void
+  clearSelection(): void
+}
+
 const props = defineProps<{
   elements: ElementDefinition[]
   modelValue?: LabelFormat
-  gridConfig?: {
-    rows?: number
-    cols?: number
-    cellWidth?: number
-    cellHeight?: number
-  }
+  gridConfig?: Partial<GridConfig>
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [format: LabelFormat]
   'save': [format: LabelFormat]
+  'grid-change': [config: GridConfig, removedCells: LabelCell[]]
 }>()
 
 const {
@@ -33,6 +38,7 @@ const {
   selectCell,
   clearSelection,
   updateGrid,
+  updateSpan,
   renameFormat,
   resetFormat,
 } = useDesigner(props.modelValue)
@@ -40,12 +46,13 @@ const {
 // Reactively apply gridConfig changes
 watchEffect(() => {
   if (props.gridConfig) {
-    updateGrid({
+    const removedCells = updateGrid({
       rows: props.gridConfig.rows ?? format.value.grid.rows,
       cols: props.gridConfig.cols ?? format.value.grid.cols,
       cellWidth: props.gridConfig.cellWidth ?? format.value.grid.cellWidth,
       cellHeight: props.gridConfig.cellHeight ?? format.value.grid.cellHeight,
     })
+    emit('grid-change', format.value.grid, removedCells)
   }
 })
 
@@ -78,11 +85,15 @@ function handleUpdateStyle(row: number, col: number, style: Partial<CSSPropertie
   }
 }
 
+function handleUpdateSpan(row: number, col: number, rowSpan: number, colSpan: number): void {
+  updateSpan(row, col, rowSpan, colSpan)
+}
+
 function handleSave(): void {
   emit('save', format.value)
 }
 
-defineExpose({
+defineExpose<LabelDesignerExpose>({
   resetFormat,
   placeElement,
   removeElement,
@@ -96,55 +107,58 @@ defineExpose({
   <div class="canvue-designer">
     <!-- Toolbar -->
     <div class="canvue-designer__toolbar">
-      <input
-        class="canvue-designer__name-input"
-        :value="format.name"
-        placeholder="Label name…"
-        @input="renameFormat(($event.target as HTMLInputElement).value)"
-      />
-      <div class="canvue-designer__grid-controls">
-        <label>
-          Rows
-          <input
-            type="number"
-            min="1"
-            max="20"
-            :value="format.grid.rows"
-            @change="updateGrid({ rows: +($event.target as HTMLInputElement).value })"
-          />
-        </label>
-        <label>
-          Cols
-          <input
-            type="number"
-            min="1"
-            max="20"
-            :value="format.grid.cols"
-            @change="updateGrid({ cols: +($event.target as HTMLInputElement).value })"
-          />
-        </label>
-        <label>
-          Cell W
-          <input
-            type="number"
-            min="20"
-            max="400"
-            :value="format.grid.cellWidth"
-            @change="updateGrid({ cellWidth: +($event.target as HTMLInputElement).value })"
-          />
-        </label>
-        <label>
-          Cell H
-          <input
-            type="number"
-            min="20"
-            max="400"
-            :value="format.grid.cellHeight"
-            @change="updateGrid({ cellHeight: +($event.target as HTMLInputElement).value })"
-          />
-        </label>
-      </div>
-      <button class="canvue-btn canvue-btn--primary" @click="handleSave">Save</button>
+      <slot name="toolbar" :format="format" :save="handleSave" :update-grid="updateGrid" :rename-format="renameFormat">
+        <input
+          class="canvue-designer__name-input"
+          :value="format.name"
+          placeholder="Label name…"
+          @input="renameFormat(($event.target as HTMLInputElement).value)"
+        />
+        <div class="canvue-designer__grid-controls">
+          <label>
+            Rows
+            <input
+              type="number"
+              min="1"
+              max="20"
+              :value="format.grid.rows"
+              @change="updateGrid({ rows: +($event.target as HTMLInputElement).value })"
+            />
+          </label>
+          <label>
+            Cols
+            <input
+              type="number"
+              min="1"
+              max="20"
+              :value="format.grid.cols"
+              @change="updateGrid({ cols: +($event.target as HTMLInputElement).value })"
+            />
+          </label>
+          <label>
+            Cell W
+            <input
+              type="number"
+              min="20"
+              max="400"
+              :value="format.grid.cellWidth"
+              @change="updateGrid({ cellWidth: +($event.target as HTMLInputElement).value })"
+            />
+          </label>
+          <label>
+            Cell H
+            <input
+              type="number"
+              min="20"
+              max="400"
+              :value="format.grid.cellHeight"
+              @change="updateGrid({ cellHeight: +($event.target as HTMLInputElement).value })"
+            />
+          </label>
+        </div>
+        <button class="canvue-btn canvue-btn--primary" @click="handleSave">Save</button>
+        <slot name="toolbar-actions" :format="format" :save="handleSave" />
+      </slot>
     </div>
 
     <!-- Main layout -->
@@ -158,7 +172,11 @@ defineExpose({
           @cell-click="selectCell"
           @drop="handleDrop"
           @remove-element="removeElement"
-        />
+        >
+          <template #cell-content="slotProps">
+            <slot name="cell-content" v-bind="slotProps" />
+          </template>
+        </GridCanvas>
       </div>
 
       <!-- Right: element panel + cell editor -->
@@ -171,6 +189,7 @@ defineExpose({
           :row="selectedCell.row"
           :col="selectedCell.col"
           @update-style="handleUpdateStyle"
+          @update-span="handleUpdateSpan"
           @close="clearSelection"
         />
       </div>

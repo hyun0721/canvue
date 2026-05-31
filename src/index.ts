@@ -1,5 +1,6 @@
 // Components
 export { default as LabelDesigner } from './components/LabelDesigner/LabelDesigner.vue'
+export type { LabelDesignerExpose } from './components/LabelDesigner/LabelDesigner.vue'
 export { default as LabelPrintPopup } from './components/LabelPrintPopup/LabelPrintPopup.vue'
 
 // Composables
