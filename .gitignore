@@ -40,4 +40,7 @@ harness/workspace/logs/
 harness/workspace/tasks/
 harness/workspace/chat/
 harness/workspace/plan/
+harness/workspace/shared/
+harness/workspace/.phase
+harness/workspace/.processed_done
 harness/.claude/
