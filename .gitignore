@@ -35,3 +35,9 @@ npm-debug.log*
 # Harness workspace (runtime files, not source)
 harness/workspace/notify/
 harness/workspace/results/
+harness/workspace/archive/
+harness/workspace/logs/
+harness/workspace/tasks/
+harness/workspace/chat/
+harness/workspace/plan/
+harness/.claude/

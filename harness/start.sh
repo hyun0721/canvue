@@ -193,6 +193,25 @@ start_agents() {
   log "전체 에이전트 시작 완료"
 }
 
+# ── fswatch 와처 시작 (백그라운드) ───────────────────────────────────────────
+start_watchers() {
+  log "fswatch 와처 시작 중..."
+
+  tmux new-window -t "$SESSION" -n "watchers"
+
+  # notify/ 감시 — .done 파일 생성 시 on-task-done.sh 호출
+  tmux send-keys -t "$SESSION:watchers" \
+    "bash $HARNESS_DIR/watch-notify.sh 2>&1 | tee $HARNESS_DIR/workspace/logs/watch-notify.log" Enter
+
+  # channel.md 감시 — @mention 시 mention-watcher.sh 호출
+  tmux split-window -v -t "$SESSION:watchers"
+  tmux send-keys -t "$SESSION:watchers.1" \
+    "bash $HARNESS_DIR/watch-channel.sh 2>&1 | tee $HARNESS_DIR/workspace/logs/watch-channel.log" Enter
+
+  mkdir -p "$HARNESS_DIR/workspace/logs"
+  log "fswatch 와처 시작 완료 (watchers 탭)"
+}
+
 # ── monitor 창 생성 ───────────────────────────────────────────────────────────
 create_monitor() {
   tmux new-window -t "$SESSION" -n "monitor"
@@ -267,6 +286,7 @@ main() {
 
   # ★ 핵심: monitor와 agents를 모두 먼저 구성한 뒤 attach
   create_monitor
+  start_watchers
   start_agents
 
   print_guide

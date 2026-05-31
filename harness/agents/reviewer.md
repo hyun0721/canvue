@@ -35,8 +35,10 @@ Implementer가 작성한 코드의 품질, 타입 안전성, 명세 준수 여�
 ```
 
 ## 작업 완료 절차
-1. `harness/workspace/results/{task_id}_review.md` 작성
-2. `touch harness/workspace/notify/{task_id}.done`
+1. `harness/workspace/results/{task_id}.md` 작성
+2. **APPROVED인 경우에만** `bash harness/done.sh {task_id}` 실행
+   - CHANGES_REQUESTED / BLOCKED 시에는 done.sh 실행 금지
+   - auto-done.sh (PostToolUse hook)이 결과 파일의 판정을 감지해 자동으로 .done 처리함
 
 ## 규칙
 - APPROVED 없이는 어떤 코드도 릴리즈 브랜치 머지 불가
@@ -85,8 +87,9 @@ sed -i '' 's/"status": "in_progress"/"status": "done"/' harness/workspace/tasks/
 
 ### Step 3. 완료 알림 (APPROVED인 경우에만)
 ```bash
-touch harness/workspace/notify/{task_id}.done
+bash harness/done.sh {task_id}
 ```
 
-> CHANGES_REQUESTED / BLOCKED 시에는 `.done` 파일을 생성하지 않음.
-> Orchestrator가 자동으로 Implementer에게 재작업 task를 생성함.
+> CHANGES_REQUESTED / BLOCKED 시에는 `done.sh` 실행 금지.
+> `auto-done.sh` (PostToolUse hook)이 결과 파일 저장 시 자동으로 판정을 읽어 처리함.
+> `watch-notify.sh`가 `.done` 파일을 감지해 `on-task-done.sh`를 호출, Orchestrator 폴링 없이 다음 단계 자동 시작.

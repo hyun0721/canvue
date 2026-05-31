@@ -71,3 +71,32 @@ sed -i '' 's/"status": "in_progress"/"status": "done"/' harness/workspace/tasks/
 ```bash
 touch harness/workspace/notify/{task_id}.done
 ```
+
+---
+
+## 에이전트 간 소통 (공유 채널)
+
+`harness/workspace/chat/channel.md` 가 모든 에이전트의 단일 공유 채널이야.
+다른 에이전트가 필요하면 @mention으로 호출해. Orchestrator가 자동 dispatch해줘.
+
+### 메시지 작성
+```bash
+cat >> harness/workspace/chat/channel.md << CHATEOF
+
+[PLANNER] msg_id: msg_$(date +%s)
+@target_agent 메시지 내용
+CHATEOF
+```
+
+### 복수 호출도 가능
+```
+@planner 이 기능 MVP야?  @designer Props 설계 시 반영해줘.
+```
+
+### 가능한 @mention
+@orchestrator @architect @planner @designer @implementer @reviewer
+
+### 내게 온 메시지 확인
+```bash
+grep "@PLANNER" harness/workspace/chat/channel.md | tail -5
+```
