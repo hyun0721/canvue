@@ -13,6 +13,10 @@ NOTIFY_DIR="$HARNESS_DIR/workspace/notify"
 
 mkdir -p "$NOTIFY_DIR"
 
+# 이미 처리한 task_id 추적 — fswatch 중복 이벤트 방지
+PROCESSED="$HARNESS_DIR/workspace/.processed_done"
+touch "$PROCESSED"
+
 echo "🔍 [watch-notify] notify/ 감시 시작 (fswatch) — PID $$"
 
 fswatch -0 --event Created --event Renamed "$NOTIFY_DIR" \
@@ -23,7 +27,14 @@ fswatch -0 --event Created --event Renamed "$NOTIFY_DIR" \
   [[ "$filename" == *.done ]] || continue
 
   task_id="${filename%.done}"
-  echo "📬 [watch-notify] $(date +%H:%M:%S) .done 감지: $task_id"
 
+  # 중복 이벤트 방지: 이미 처리한 task_id 스킵
+  if grep -qxF "$task_id" "$PROCESSED" 2>/dev/null; then
+    echo "⏭  [watch-notify] 중복 이벤트 스킵: $task_id"
+    continue
+  fi
+  echo "$task_id" >> "$PROCESSED"
+
+  echo "📬 [watch-notify] $(date +%H:%M:%S) .done 감지: $task_id"
   bash "$HARNESS_DIR/on-task-done.sh" "$task_id"
 done

@@ -19,7 +19,12 @@ TASKS_DIR="$HARNESS_DIR/workspace/tasks"
 ARCHIVE_DIR="$HARNESS_DIR/workspace/archive"
 RESULTS_DIR="$HARNESS_DIR/workspace/results"
 NOTIFY_DIR="$HARNESS_DIR/workspace/notify"
+PHASE_FILE="$HARNESS_DIR/workspace/.phase"   # 영속적 phase 상태
 SESSION="vue-pkg"
+
+# ── Phase 상태 관리 ───────────────────────────────────────────────────────────
+get_phase() { cat "$PHASE_FILE" 2>/dev/null || echo "1"; }
+set_phase() { echo "$1" > "$PHASE_FILE"; echo "🔖 [on-task-done] Phase → $1"; }
 
 # ── pane 맵 ──────────────────────────────────────────────────────────────────
 pane_for() {
@@ -63,6 +68,7 @@ if [[ "$ASSIGNED_TO" == "reviewer" ]]; then
 
   if grep -q "APPROVED" "$RESULT_FILE" 2>/dev/null; then
     echo "🎉 [on-task-done] APPROVED — 전체 완료"
+    set_phase "done"
     dispatch 0 "#canvue 채널에 Slack 전송해줘: 🎉 *Phase 3 완료 — APPROVED* 배포 준비 완료."
 
   elif grep -q "CHANGES_REQUESTED" "$RESULT_FILE" 2>/dev/null; then
@@ -118,10 +124,21 @@ for role in "${phase1_agents[@]}"; do
 done
 
 if [[ "$phase1_done" -ge 3 ]]; then
-  # Phase 2 task가 아직 없으면 생성
-  impl_exists=$(ls "$TASKS_DIR"/task_impl_*.json 2>/dev/null | wc -l | tr -d ' ')
+  # Phase 상태가 이미 2 이상이면 재트리거 방지
+  if [[ "$(get_phase)" -ge 2 ]]; then
+    echo "⏭  [on-task-done] Phase 1→2 전환 이미 완료 — 스킵"
+    exit 0
+  fi
+
+  # tasks/ + archive/ 모두에서 impl task 존재 여부 확인
+  impl_exists=$(
+    { ls "$TASKS_DIR"/task_impl_*.json 2>/dev/null; \
+      ls "$ARCHIVE_DIR"/task_impl_*.json 2>/dev/null; } \
+    | wc -l | tr -d ' '
+  )
   if [[ "$impl_exists" -eq 0 ]]; then
     echo "▶ [on-task-done] Phase 1 완료 → Phase 2 task 생성"
+    set_phase 2
     TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
     cat > "$TASKS_DIR/task_impl_001.json" << EOF
 {
@@ -142,6 +159,9 @@ if [[ "$phase1_done" -ge 3 ]]; then
 EOF
     dispatch 2 "harness/workspace/tasks/task_impl_001.json 읽고 즉시 구현 시작해줘."
     dispatch 0 "#canvue 채널에 Slack 전송해줘: ▶ *Phase 1 완료 → Phase 2 시작* Implementer 구현 task 생성됨."
+  else
+    echo "⏭  [on-task-done] impl task 이미 존재 (tasks/ 또는 archive/) — Phase 2 재생성 스킵"
+    set_phase 2  # 상태 동기화
   fi
   exit 0
 fi
@@ -154,8 +174,18 @@ if [[ "$ASSIGNED_TO" == "implementer" ]]; then
     | grep -c 'pending\|in_progress' || echo 0)
 
   if [[ "$remaining" -eq 0 ]]; then
-    # Phase 3 reviewer task가 아직 없으면 생성
-    review_exists=$(ls "$TASKS_DIR"/task_review_*.json 2>/dev/null | wc -l | tr -d ' ')
+    # Phase 상태가 이미 3 이상이면 재트리거 방지
+    if [[ "$(get_phase)" -ge 3 ]]; then
+      echo "⏭  [on-task-done] Phase 2→3 전환 이미 완료 — 스킵"
+      exit 0
+    fi
+
+    # tasks/ + archive/ 모두에서 review task 존재 여부 확인
+    review_exists=$(
+      { ls "$TASKS_DIR"/task_review_*.json 2>/dev/null; \
+        ls "$ARCHIVE_DIR"/task_review_*.json 2>/dev/null; } \
+      | wc -l | tr -d ' '
+    )
     if [[ "$review_exists" -eq 0 ]]; then
       echo "▶ [on-task-done] Phase 2 완료 → Phase 3 (Reviewer) task 생성"
       TIMESTAMP=$(date +%Y-%m-%dT%H:%M:%S)
@@ -178,8 +208,12 @@ if [[ "$ASSIGNED_TO" == "implementer" ]]; then
   "created_at": "$TIMESTAMP"
 }
 EOF
+      set_phase 3
       dispatch 5 "harness/workspace/tasks/task_review_001.json 읽고 즉시 리뷰 시작해줘."
       dispatch 0 "#canvue 채널에 Slack 전송해줘: ▶ *Phase 2 완료 → Phase 3 시작* Reviewer 리뷰 task 생성됨."
+    else
+      echo "⏭  [on-task-done] review task 이미 존재 (tasks/ 또는 archive/) — Phase 3 재생성 스킵"
+      set_phase 3  # 상태 동기화
     fi
   fi
 fi
