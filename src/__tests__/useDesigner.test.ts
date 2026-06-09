@@ -13,6 +13,8 @@ describe('useDesigner', () => {
     const { format } = useDesigner()
     expect(format.value.grid.rows).toBe(4)
     expect(format.value.grid.cols).toBe(4)
+    expect(format.value.grid.cellWidths).toHaveLength(4)
+    expect(format.value.grid.cellHeights).toHaveLength(4)
     expect(format.value.cells).toHaveLength(0)
   })
 
@@ -52,6 +54,8 @@ describe('useDesigner', () => {
     updateGrid({ rows: 6, cols: 5 })
     expect(format.value.grid.rows).toBe(6)
     expect(format.value.grid.cols).toBe(5)
+    expect(format.value.grid.cellWidths).toHaveLength(5)
+    expect(format.value.grid.cellHeights).toHaveLength(6)
   })
 
   it('removes out-of-bounds cells after grid shrink', () => {
@@ -102,5 +106,34 @@ describe('useDesigner', () => {
     expect(selectedCell.value).toEqual({ row: 2, col: 3 })
     clearSelection()
     expect(selectedCell.value).toBeNull()
+  })
+
+  // ── Undo tests ──
+
+  it('canUndo is false initially, true after a mutation', () => {
+    const { canUndo, placeElement } = useDesigner()
+    expect(canUndo.value).toBe(false)
+    placeElement(0, 0, textEl)
+    expect(canUndo.value).toBe(true)
+  })
+
+  it('undo restores state after placeElement', () => {
+    const { format, canUndo, placeElement, undo } = useDesigner()
+    placeElement(0, 0, textEl)
+    expect(format.value.cells).toHaveLength(1)
+    undo()
+    expect(format.value.cells).toHaveLength(0)
+    expect(canUndo.value).toBe(false)
+  })
+
+  it('undo restores state after removeElement', () => {
+    const { format, placeElement, removeElement, undo } = useDesigner()
+    placeElement(0, 0, textEl)
+    // consume the placeElement snapshot
+    removeElement(0, 0)
+    expect(format.value.cells).toHaveLength(0)
+    undo()
+    expect(format.value.cells).toHaveLength(1)
+    expect(format.value.cells[0].element?.fieldKey).toBe('productName')
   })
 })

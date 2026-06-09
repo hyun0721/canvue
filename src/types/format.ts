@@ -3,8 +3,8 @@ import type { CSSProperties } from 'vue'
 export interface GridConfig {
   rows: number
   cols: number
-  cellWidth: number  // px
-  cellHeight: number // px
+  cellWidths: number[]   // px per column (length === cols)
+  cellHeights: number[]  // px per row (length === rows)
 }
 
 export interface LabelElement {

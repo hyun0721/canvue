@@ -43,7 +43,7 @@ function onUpdate(format: LabelFormat) {
     <LabelDesigner
       :elements="elements"
       :model-value="currentFormat"
-      :grid-config="{ rows: 3, cols: 4, cellWidth: 100, cellHeight: 70 }"
+      :grid-config="{ rows: 3, cols: 4, cellWidths: [100, 100, 100, 100], cellHeights: [70, 70, 70] }"
       @update:model-value="onUpdate"
       @save="onSave"
     />

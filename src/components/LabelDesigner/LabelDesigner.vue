@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, computed, watchEffect } from 'vue'
+import { watch, computed, ref, onMounted, onUnmounted } from 'vue'
 import type { LabelFormat, LabelCell, ElementDefinition, GridConfig } from '../../types'
 import type { CSSProperties } from 'vue'
 import { useDesigner } from '../../composables/useDesigner'
@@ -32,29 +32,40 @@ const {
   format,
   selectedCell,
   cellMatrix,
+  canUndo,
   getCellAt,
   placeElement,
   removeElement,
   selectCell,
   clearSelection,
   updateGrid,
+  addRow,
+  deleteRow,
+  addCol,
+  deleteCol,
+  updateColWidth,
+  updateRowHeight,
   updateSpan,
   renameFormat,
   resetFormat,
+  snapshot,
+  undo,
 } = useDesigner(props.modelValue)
 
-// Reactively apply gridConfig changes
-watchEffect(() => {
-  if (props.gridConfig) {
-    const removedCells = updateGrid({
-      rows: props.gridConfig.rows ?? format.value.grid.rows,
-      cols: props.gridConfig.cols ?? format.value.grid.cols,
-      cellWidth: props.gridConfig.cellWidth ?? format.value.grid.cellWidth,
-      cellHeight: props.gridConfig.cellHeight ?? format.value.grid.cellHeight,
-    })
+// Reactively apply gridConfig changes (deep watch with JSON.stringify dedup, skipSnapshot)
+let _prevGridConfigJSON = ''
+watch(
+  () => props.gridConfig,
+  (val) => {
+    if (!val) return
+    const next = JSON.stringify(val)
+    if (next === _prevGridConfigJSON) return
+    _prevGridConfigJSON = next
+    const removedCells = updateGrid({ ...val }, true)  // external props sync: skip snapshot
     emit('grid-change', format.value.grid, removedCells)
-  }
-})
+  },
+  { deep: true, immediate: true }
+)
 
 // Sync external v-model changes in
 watch(
@@ -74,6 +85,37 @@ const selectedCellData = computed(() => {
   return getCellAt(selectedCell.value.row, selectedCell.value.col) ?? null
 })
 
+// ── Local state for rows/cols inputs (prevent mid-type revert) ──
+const localRows = ref(format.value.grid.rows)
+const localCols = ref(format.value.grid.cols)
+
+watch(() => format.value.grid.rows, (v) => { localRows.value = v })
+watch(() => format.value.grid.cols, (v) => { localCols.value = v })
+
+function handleRowsCommit(): void {
+  const v = localRows.value
+  if (v >= 1 && v <= 50 && v !== format.value.grid.rows) updateGrid({ rows: v })
+  else localRows.value = format.value.grid.rows
+}
+
+function handleColsCommit(): void {
+  const v = localCols.value
+  if (v >= 1 && v <= 50 && v !== format.value.grid.cols) updateGrid({ cols: v })
+  else localCols.value = format.value.grid.cols
+}
+
+// ── Keyboard shortcut: Ctrl+Z / Cmd+Z ──
+function handleKeydown(e: KeyboardEvent): void {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault()
+    undo()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+
+// ── GridCanvas event handlers ──
 function handleDrop(row: number, col: number, definition: ElementDefinition): void {
   placeElement(row, col, definition)
 }
@@ -87,6 +129,22 @@ function handleUpdateStyle(row: number, col: number, style: Partial<CSSPropertie
 
 function handleUpdateSpan(row: number, col: number, rowSpan: number, colSpan: number): void {
   updateSpan(row, col, rowSpan, colSpan)
+}
+
+function handleColResizeStart(_colIdx: number): void {
+  snapshot()
+}
+
+function handleRowResizeStart(_rowIdx: number): void {
+  snapshot()
+}
+
+function handleColResize(colIdx: number, width: number): void {
+  updateColWidth(colIdx, width)
+}
+
+function handleRowResize(rowIdx: number, height: number): void {
+  updateRowHeight(rowIdx, height)
 }
 
 function handleSave(): void {
@@ -120,9 +178,10 @@ defineExpose<LabelDesignerExpose>({
             <input
               type="number"
               min="1"
-              max="20"
-              :value="format.grid.rows"
-              @change="updateGrid({ rows: +($event.target as HTMLInputElement).value })"
+              max="50"
+              v-model.number="localRows"
+              @blur="handleRowsCommit"
+              @keydown.enter="handleRowsCommit"
             />
           </label>
           <label>
@@ -130,32 +189,19 @@ defineExpose<LabelDesignerExpose>({
             <input
               type="number"
               min="1"
-              max="20"
-              :value="format.grid.cols"
-              @change="updateGrid({ cols: +($event.target as HTMLInputElement).value })"
-            />
-          </label>
-          <label>
-            Cell W
-            <input
-              type="number"
-              min="20"
-              max="400"
-              :value="format.grid.cellWidth"
-              @change="updateGrid({ cellWidth: +($event.target as HTMLInputElement).value })"
-            />
-          </label>
-          <label>
-            Cell H
-            <input
-              type="number"
-              min="20"
-              max="400"
-              :value="format.grid.cellHeight"
-              @change="updateGrid({ cellHeight: +($event.target as HTMLInputElement).value })"
+              max="50"
+              v-model.number="localCols"
+              @blur="handleColsCommit"
+              @keydown.enter="handleColsCommit"
             />
           </label>
         </div>
+        <button
+          class="canvue-btn canvue-btn--ghost"
+          :disabled="!canUndo"
+          title="Undo (Ctrl+Z)"
+          @click="undo"
+        >↩ Undo</button>
         <button class="canvue-btn canvue-btn--primary" @click="handleSave">Save</button>
         <slot name="toolbar-actions" :format="format" :save="handleSave" />
       </slot>
@@ -172,6 +218,14 @@ defineExpose<LabelDesignerExpose>({
           @cell-click="selectCell"
           @drop="handleDrop"
           @remove-element="removeElement"
+          @add-row="addRow"
+          @add-col="addCol"
+          @delete-row="deleteRow"
+          @delete-col="deleteCol"
+          @col-resize-start="handleColResizeStart"
+          @col-resize="handleColResize"
+          @row-resize-start="handleRowResizeStart"
+          @row-resize="handleRowResize"
         >
           <template #cell-content="slotProps">
             <slot name="cell-content" v-bind="slotProps" />
@@ -267,6 +321,21 @@ defineExpose<LabelDesignerExpose>({
 
 .canvue-btn--primary:hover {
   background: var(--canvue-accent-dark, #2563eb);
+}
+
+.canvue-btn--ghost {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.canvue-btn--ghost:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.canvue-btn--ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .canvue-designer__body {

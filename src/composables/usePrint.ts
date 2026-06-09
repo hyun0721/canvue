@@ -105,8 +105,10 @@ async function buildPrintHtml(
   options: PrintOptions
 ): Promise<string> {
   const { grid } = format
-  const labelWidth = grid.cols * grid.cellWidth
-  const labelHeight = grid.rows * grid.cellHeight
+  const labelWidth = grid.cellWidths.reduce((a, b) => a + b, 0)
+  const labelHeight = grid.cellHeights.reduce((a, b) => a + b, 0)
+  const gridTemplateColumns = grid.cellWidths.map((w) => `${w}px`).join(' ')
+  const gridTemplateRows = grid.cellHeights.map((h) => `${h}px`).join(' ')
 
   const labelParts = await Promise.all(
     records.map(async (record, i) => {
@@ -121,8 +123,8 @@ async function buildPrintHtml(
           height: ${labelHeight}px;
           position: relative;
           display: grid;
-          grid-template-columns: repeat(${grid.cols}, ${grid.cellWidth}px);
-          grid-template-rows: repeat(${grid.rows}, ${grid.cellHeight}px);
+          grid-template-columns: ${gridTemplateColumns};
+          grid-template-rows: ${gridTemplateRows};
           border: 1px solid #ccc;
           ${pageBreak}
         ">

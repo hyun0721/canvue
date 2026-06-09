@@ -8,18 +8,23 @@ const props = defineProps<{
   record: DataRecord
 }>()
 
-const gridStyle = computed(() => ({
-  display: 'grid',
-  gridTemplateColumns: `repeat(${props.format.grid.cols}, ${props.format.grid.cellWidth}px)`,
-  gridTemplateRows: `repeat(${props.format.grid.rows}, ${props.format.grid.cellHeight}px)`,
-  width: `${props.format.grid.cols * props.format.grid.cellWidth}px`,
-  height: `${props.format.grid.rows * props.format.grid.cellHeight}px`,
-  border: '1px solid #ccc',
-  background: '#fff',
-  gap: '1px',
-  backgroundColor: '#ddd',
-  fontFamily: 'sans-serif',
-}))
+const gridStyle = computed(() => {
+  const { grid } = props.format
+  const totalWidth = grid.cellWidths.reduce((a, b) => a + b, 0)
+  const totalHeight = grid.cellHeights.reduce((a, b) => a + b, 0)
+  return {
+    display: 'grid',
+    gridTemplateColumns: grid.cellWidths.map((w) => `${w}px`).join(' '),
+    gridTemplateRows: grid.cellHeights.map((h) => `${h}px`).join(' '),
+    width: `${totalWidth}px`,
+    height: `${totalHeight}px`,
+    border: '1px solid #ccc',
+    background: '#fff',
+    gap: '1px',
+    backgroundColor: '#ddd',
+    fontFamily: 'sans-serif',
+  }
+})
 
 function cellValue(fieldKey: string): string {
   const val = props.record[fieldKey]
@@ -72,8 +77,6 @@ watch(() => [props.format, props.record], prerenderCells, { deep: true })
         :style="{
           gridColumn: `${cell.col + 1} / span ${cell.colSpan ?? 1}`,
           gridRow: `${cell.row + 1} / span ${cell.rowSpan ?? 1}`,
-          width: `${(cell.colSpan ?? 1) * format.grid.cellWidth}px`,
-          height: `${(cell.rowSpan ?? 1) * format.grid.cellHeight}px`,
           ...cell.element?.style,
         }"
       >
